@@ -1,0 +1,9 @@
+[tool.ruff]
+line-length = 88
+fix = true
+
+[tool.ruff.lint]
+select = ["I", "Q", "F"]
+
+[tool.ruff.format]
+quote-style = "double"
