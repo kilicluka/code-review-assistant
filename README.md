@@ -23,35 +23,81 @@ All configuration is via environment variables:
 |----------|---------|-------------|
 | `LLM_API_KEY` | (required) | API key for the LLM provider |
 | `LLM_MODEL` | `claude-sonnet-4-20250514` | Model to use |
-| `LLM_PROVIDER` | `anthropic` | LLM provider (currently only anthropic) |
+| `LLM_PROVIDER` | `anthropic` | LLM provider (`anthropic` or `openai`) |
+| `LLM_MAX_TOKENS` | `8192` | Maximum tokens for LLM responses |
 
 ## Usage
 
+```bash
+# Using Anthropic (default)
+python main.py /path/to/project
+
+# Using a different Anthropic model
+python main.py /path/to/project --model claude-opus-4-20250514
+
+# Using OpenAI
+python main.py /path/to/project --provider openai --model gpt-4o
 ```
-You: Review this project
-You: What could be improved in the auth module?
-You: Are there any security issues?
-You: help
-You: exit
+
+**CLI flags:**
+
+| Flag | Description |
+|------|-------------|
+| `--provider` | LLM provider (`anthropic` or `openai`). Overrides `LLM_PROVIDER` env var. |
+| `--model` | Model identifier (e.g., `claude-sonnet-4-20250514`, `gpt-4o`). Overrides `LLM_MODEL` env var. |
+
+**Interactive commands:**
+```
+You: review                         # Review entire codebase
+You: review --filter auth           # Review files matching 'auth'
+You: review --filter src/utils/     # Review specific folder
+
+You: How should I fix that issue?   # Follow-up question (no file reload)
+You: What's wrong with this code?   # Ask about pasted snippets
+    <paste code here>
+
+You: summary                        # Show codebase structure
+You: clear                          # Clear conversation history
+You: help                           # Show available commands
+You: exit                           # Exit
 ```
 
 ## Design Decisions
 
 ### Architecture
 
-TODO: Document architecture choices
+The assistant follows a modular design with clear separation of concerns:
+
+- **`llm_client.py`**: Protocol-based abstraction for LLM providers. New providers can be added by implementing the `LLMClient` protocol and updating the `create_client` factory.
+- **`file_loader.py`**: Handles file system traversal with safety limits (max depth, max files, symlink skipping).
+- **`reviewer.py`**: Core logic that combines file loading with LLM calls. Maintains conversation history for follow-up questions.
+- **`main.py`**: CLI entry point using argparse. Routes between `review` (loads files) and `ask` (uses existing context).
+
+Dependency injection is used for the LLM client, making testing and provider swapping straightforward.
 
 ### LLM Selection
 
-TODO: Document why Claude/Anthropic
+Supports both **Anthropic Claude** and **OpenAI GPT** models. Claude Sonnet is the default due to strong code understanding and reasonable cost. Users can switch via `--provider openai` flag.
 
 ### Code Analysis Strategy
 
-TODO: Document file traversal approach and tradeoffs
+Simple file traversal approach: read all matching files, concatenate, send to LLM. This works well for small-to-medium projects that fit within context limits.
+
+**Trade-offs:**
+- ✅ Simple, no preprocessing required
+- ✅ LLM sees full context, can identify cross-file issues
+- ❌ Doesn't scale to very large codebases
+- ❌ No semantic understanding of code structure
+
+For production, consider embedding-based retrieval or AST parsing (see Future Improvements).
 
 ### Prompt Engineering
 
-TODO: Document prompt design
+The system prompt instructs the LLM to evaluate code across five dimensions: security, performance, code quality, maintainability, and best practices. Key guidelines:
+- Reference specific files and line numbers
+- Prioritize high-impact issues
+- Be constructive, suggest fixes
+- Acknowledge good patterns
 
 ## Future Improvements
 
@@ -85,12 +131,17 @@ Parse code into Abstract Syntax Trees to:
 - Enable more targeted analysis (e.g., "review all functions that handle user input")
 - Detect patterns without sending full code to LLM
 
+## Security Considerations
+
+**Path Traversal**: The tool reads files from a user-specified directory. Since this is a local CLI tool, the user already has access to any files they point it at. Symlinks are skipped to prevent escaping the target directory during traversal. For a web service deployment, additional path boundary validation would be recommended.
+
+**API Keys**: Keys are read from environment variables, not stored in code. Never commit `.env` files or hardcode keys.
+
 ## Known Limitations
 
 - **Context limits**: Large codebases may exceed LLM context window
-- **Single provider**: Currently only supports Anthropic
 - **No caching**: Each request re-reads files and calls the LLM
-- **Basic filtering**: Keyword-based file filtering, not semantic
+- **Basic filtering**: Path-based file filtering only, not semantic
 
 ## Project Structure
 
