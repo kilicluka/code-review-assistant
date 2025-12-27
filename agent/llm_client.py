@@ -52,7 +52,6 @@ class LLMClient(Protocol):
         Returns:
             The assistant's response text
         """
-        ...
 
 
 class _AnthropicClient:
