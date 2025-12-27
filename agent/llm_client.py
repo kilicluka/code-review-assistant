@@ -9,20 +9,21 @@ from enum import Enum
 from typing import Literal, Protocol, TypedDict
 
 import anthropic
+import openai
 
 
 class LLMProvider(Enum):
     """Supported LLM providers."""
 
     ANTHROPIC = "anthropic"
-    # Planned providers (not yet implemented)
     OPENAI = "openai"
+    # Planned (not yet implemented)
     GEMINI = "gemini"
 
     @classmethod
     def supported(cls) -> list["LLMProvider"]:
         """Return list of currently implemented providers."""
-        return [cls.ANTHROPIC]
+        return [cls.ANTHROPIC, cls.OPENAI]
 
     @classmethod
     def is_supported(cls, provider: "LLMProvider") -> bool:
@@ -72,6 +73,27 @@ class _AnthropicClient:
         return response.content[0].text
 
 
+class _OpenAIClient:
+    """OpenAI implementation of LLMClient. Use create_client() instead."""
+
+    def __init__(self, api_key: str, model: str, max_tokens: int):
+        self._client = openai.OpenAI(api_key=api_key)
+        self._model = model
+        self._max_tokens = max_tokens
+
+    def chat(self, system: str, messages: list[ChatMessage]) -> str:
+        # OpenAI expects system message as part of messages array
+        full_messages: list[dict[str, str]] = [{"role": "system", "content": system}]
+        full_messages.extend(messages)
+
+        response = self._client.chat.completions.create(
+            model=self._model,
+            max_tokens=self._max_tokens,
+            messages=full_messages,
+        )
+        return response.choices[0].message.content or ""
+
+
 def create_client(
     provider: LLMProvider, api_key: str, model: str, max_tokens: int
 ) -> LLMClient:
@@ -92,6 +114,9 @@ def create_client(
     """
     if provider == LLMProvider.ANTHROPIC:
         return _AnthropicClient(api_key, model, max_tokens)
+
+    if provider == LLMProvider.OPENAI:
+        return _OpenAIClient(api_key, model, max_tokens)
 
     supported = [p.value for p in LLMProvider.supported()]
     raise ValueError(
