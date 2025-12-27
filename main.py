@@ -6,11 +6,34 @@ An AI-powered tool for automated code review.
 
 import argparse
 import sys
+from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
 
 from agent.llm_client import LLMProvider, create_client
 from agent.reviewer import CodeReviewer
 from config import LLM_API_KEY, LLM_MAX_TOKENS, LLM_MODEL, LLM_PROVIDER
+
+
+@dataclass
+class ReviewSession:
+    """Configuration and state for an active review session."""
+
+    reviewer: CodeReviewer
+    provider: LLMProvider
+    codebase_path: Path
+    model: str
+
+
+class Command(StrEnum):
+    """Available CLI commands."""
+
+    EXIT = "exit"
+    QUIT = "quit"
+    HELP = "help"
+    SUMMARY = "summary"
+    CLEAR = "clear"
+    REVIEW = "review"
 
 
 def parse_args() -> argparse.Namespace:
@@ -100,9 +123,12 @@ For follow-up questions (uses existing context):
     )
 
 
-def main() -> None:
-    args = parse_args()
+def create_session(args: argparse.Namespace) -> ReviewSession:
+    """
+    Set up and return a configured review session.
 
+    Validates configuration, creates LLM client, and initializes the reviewer.
+    """
     if not LLM_API_KEY:
         print("Error: LLM_API_KEY environment variable not set.")
         print("Please set it with: export LLM_API_KEY='your-api-key'")
@@ -122,7 +148,6 @@ def main() -> None:
         print(f"Error: Path is not a directory: {path}")
         sys.exit(1)
 
-    # Create LLM client using factory
     try:
         provider = LLMProvider(args.provider)
         llm_client = create_client(
@@ -133,14 +158,22 @@ def main() -> None:
         sys.exit(1)
 
     reviewer = CodeReviewer(str(path), llm_client)
+    return ReviewSession(
+        reviewer=reviewer,
+        provider=provider,
+        codebase_path=path,
+        model=args.model,
+    )
 
+
+def run_interactive_session(session: ReviewSession) -> None:
+    """Run the main CLI interaction loop."""
     print("\nCode Review Assistant")
-    print(f"Provider: {provider.value} | Model: {args.model}")
-    print(f"Codebase: {path}\n")
-    print(reviewer.get_summary())
+    print(f"Provider: {session.provider.value} | Model: {session.model}")
+    print(f"Codebase: {session.codebase_path}\n")
+    print(session.reviewer.get_summary())
     print("\nType 'help' for available commands, or ask me to review your code.\n")
 
-    # Main interaction loop
     while True:
         try:
             user_input = input("You: ").strip()
@@ -151,23 +184,26 @@ def main() -> None:
         if not user_input:
             continue
 
-        command = user_input.lower()
-        if command in ["exit", "quit"]:
+        command_str = user_input.lower()
+
+        if command_str in (Command.EXIT, Command.QUIT):
             print("Goodbye!")
             break
-        elif command == "help":
+
+        if command_str == Command.HELP:
             print_help()
             continue
-        elif command == "summary":
-            print(reviewer.get_summary())
+
+        if command_str == Command.SUMMARY:
+            print(session.reviewer.get_summary())
             continue
-        elif command == "clear":
-            reviewer.clear_history()
+
+        if command_str == Command.CLEAR:
+            session.reviewer.clear_history()
             print("Conversation history cleared.")
             continue
 
-        # Check if this is a review command (loads files) or a follow-up question
-        if command.startswith("review"):
+        if command_str.startswith(Command.REVIEW):
             query, filter_pattern = parse_review_command(user_input)
 
             if filter_pattern:
@@ -175,13 +211,20 @@ def main() -> None:
             else:
                 print("\nAnalyzing code...\n")
 
-            response = reviewer.review(query, filter_pattern)
+            response = session.reviewer.review(query, filter_pattern)
         else:
             # Follow-up question or ad-hoc query - use existing context
             print("\nThinking...\n")
-            response = reviewer.ask(user_input)
+            response = session.reviewer.ask(user_input)
 
         print(f"Assistant:\n{response}\n")
+
+
+def main() -> None:
+    """Main entry point."""
+    args = parse_args()
+    session = create_session(args)
+    run_interactive_session(session)
 
 
 if __name__ == "__main__":
