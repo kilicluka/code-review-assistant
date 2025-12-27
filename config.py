@@ -5,8 +5,9 @@ Configuration for the Code Review Assistant.
 import os
 
 # LLM Configuration
-ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
-MODEL = "claude-sonnet-4-20250514"
+LLM_API_KEY = os.environ.get("LLM_API_KEY")
+LLM_MODEL = os.environ.get("LLM_MODEL", "claude-sonnet-4-20250514")
+LLM_PROVIDER = os.environ.get("LLM_PROVIDER", "anthropic")
 
 # File Processing Configuration
 SUPPORTED_EXTENSIONS = [
