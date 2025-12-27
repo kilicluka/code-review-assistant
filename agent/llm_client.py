@@ -54,24 +54,27 @@ class LLMClient(Protocol):
         ...
 
 
-class AnthropicClient:
-    """Anthropic Claude implementation of LLMClient."""
+class _AnthropicClient:
+    """Anthropic Claude implementation of LLMClient. Use create_client() instead."""
 
-    def __init__(self, api_key: str, model: str):
-        self.client = anthropic.Anthropic(api_key=api_key)
-        self.model = model
+    def __init__(self, api_key: str, model: str, max_tokens: int):
+        self._client = anthropic.Anthropic(api_key=api_key)
+        self._model = model
+        self._max_tokens = max_tokens
 
     def chat(self, system: str, messages: list[ChatMessage]) -> str:
-        response = self.client.messages.create(
-            model=self.model,
-            max_tokens=4096,
+        response = self._client.messages.create(
+            model=self._model,
+            max_tokens=self._max_tokens,
             system=system,
             messages=messages,
         )
         return response.content[0].text
 
 
-def create_client(provider: LLMProvider, api_key: str, model: str) -> LLMClient:
+def create_client(
+    provider: LLMProvider, api_key: str, model: str, max_tokens: int
+) -> LLMClient:
     """
     Factory function to create an LLM client for the specified provider.
 
@@ -79,6 +82,7 @@ def create_client(provider: LLMProvider, api_key: str, model: str) -> LLMClient:
         provider: The LLM provider to use
         api_key: API key for the provider
         model: Model identifier to use
+        max_tokens: Maximum tokens for responses
 
     Returns:
         An LLM client instance
@@ -87,7 +91,7 @@ def create_client(provider: LLMProvider, api_key: str, model: str) -> LLMClient:
         ValueError: If the provider is not yet implemented
     """
     if provider == LLMProvider.ANTHROPIC:
-        return AnthropicClient(api_key, model)
+        return _AnthropicClient(api_key, model, max_tokens)
 
     supported = [p.value for p in LLMProvider.supported()]
     raise ValueError(

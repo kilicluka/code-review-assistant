@@ -8,6 +8,7 @@ import os
 LLM_API_KEY = os.environ.get("LLM_API_KEY")
 LLM_MODEL = os.environ.get("LLM_MODEL", "claude-sonnet-4-20250514")
 LLM_PROVIDER = os.environ.get("LLM_PROVIDER", "anthropic")
+LLM_MAX_TOKENS = int(os.environ.get("LLM_MAX_TOKENS", "8192"))
 
 # File Processing Configuration
 SUPPORTED_EXTENSIONS = [
