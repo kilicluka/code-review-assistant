@@ -36,7 +36,14 @@ class Command(StrEnum):
     REVIEW = "review"
 
 
-def parse_args() -> argparse.Namespace:
+def main() -> None:
+    """Main entry point."""
+    args = _parse_args()
+    session = _create_session(args)
+    _run_interactive_session(session)
+
+
+def _parse_args() -> argparse.Namespace:
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
         description="AI-powered code review assistant",
@@ -71,59 +78,7 @@ Examples:
     return parser.parse_args()
 
 
-def parse_review_command(user_input: str) -> tuple[str, str | None]:
-    """
-    Parse user input for review command and optional filter.
-
-    Supports:
-      "review" or "Review this project" -> (query, None)
-      "review --filter auth" -> (query, "auth")
-      "review --filter auth/ Check security" -> ("Check security", "auth/")
-
-    Returns (query, filter_pattern).
-    """
-    if "--filter" not in user_input:
-        return user_input, None
-
-    parts = user_input.split("--filter", 1)
-    before_filter = parts[0].strip()
-    after_filter = parts[1].strip()
-
-    filter_parts = after_filter.split(maxsplit=1)
-    filter_pattern = filter_parts[0] if filter_parts else None
-    remaining_query = filter_parts[1] if len(filter_parts) > 1 else ""
-
-    query = f"{before_filter} {remaining_query}".strip()
-    if not query:
-        query = "Review the code"
-
-    return query, filter_pattern
-
-
-def print_help() -> None:
-    """Print available commands."""
-    print(
-        """
-Available commands:
-  help          - Show this help message
-  summary       - Show codebase structure summary
-  clear         - Clear conversation history
-  exit / quit   - Exit the assistant
-
-To review code (loads files from codebase):
-  review                         - Review entire codebase
-  review --filter auth           - Review files matching 'auth'
-  review --filter src/utils/     - Review files in specific folder
-
-For follow-up questions (uses existing context):
-  How should I fix the SQL injection?
-  Can you explain the auth flow?
-  What's wrong with this code? <paste snippet>
-"""
-    )
-
-
-def create_session(args: argparse.Namespace) -> ReviewSession:
+def _create_session(args: argparse.Namespace) -> ReviewSession:
     """
     Set up and return a configured review session.
 
@@ -134,7 +89,6 @@ def create_session(args: argparse.Namespace) -> ReviewSession:
         print("Please set it with: export LLM_API_KEY='your-api-key'")
         sys.exit(1)
 
-    # Get codebase path from args or prompt
     if args.path:
         codebase_path = args.path
     else:
@@ -166,7 +120,7 @@ def create_session(args: argparse.Namespace) -> ReviewSession:
     )
 
 
-def run_interactive_session(session: ReviewSession) -> None:
+def _run_interactive_session(session: ReviewSession) -> None:
     """Run the main CLI interaction loop."""
     print("\nCode Review Assistant")
     print(f"Provider: {session.provider.value} | Model: {session.model}")
@@ -191,7 +145,7 @@ def run_interactive_session(session: ReviewSession) -> None:
             break
 
         if command_str == Command.HELP:
-            print_help()
+            _print_help()
             continue
 
         if command_str == Command.SUMMARY:
@@ -204,7 +158,7 @@ def run_interactive_session(session: ReviewSession) -> None:
             continue
 
         if command_str.startswith(Command.REVIEW):
-            query, filter_pattern = parse_review_command(user_input)
+            query, filter_pattern = _parse_review_command(user_input)
 
             if filter_pattern:
                 print(f"\nAnalyzing files matching '{filter_pattern}'...\n")
@@ -213,18 +167,59 @@ def run_interactive_session(session: ReviewSession) -> None:
 
             response = session.reviewer.review(query, filter_pattern)
         else:
-            # Follow-up question or ad-hoc query - use existing context
             print("\nThinking...\n")
             response = session.reviewer.ask(user_input)
 
         print(f"Assistant:\n{response}\n")
 
 
-def main() -> None:
-    """Main entry point."""
-    args = parse_args()
-    session = create_session(args)
-    run_interactive_session(session)
+def _parse_review_command(user_input: str) -> tuple[str, str | None]:
+    """
+    Parse user input for review command and optional filter.
+
+    Supports:
+      "review" or "Review this project" -> (query, None)
+      "review --filter auth" -> ("review", "auth")
+      "review --filter auth/ Check security" -> ("review Check security", "auth/")
+
+    Returns (query, filter_pattern).
+    """
+    if "--filter" not in user_input:
+        return user_input, None
+
+    parts = user_input.split("--filter", 1)
+    before_filter = parts[0].strip()
+    after_filter = parts[1].strip()
+
+    filter_parts = after_filter.split(maxsplit=1)
+    filter_pattern = filter_parts[0] if filter_parts else None
+    remaining_query = filter_parts[1] if len(filter_parts) > 1 else ""
+
+    query = f"{before_filter} {remaining_query}".strip()
+    return query, filter_pattern
+
+
+def _print_help() -> None:
+    """Print available commands."""
+    print(
+        """
+Available commands:
+  help          - Show this help message
+  summary       - Show codebase structure summary
+  clear         - Clear conversation history
+  exit / quit   - Exit the assistant
+
+To review code (loads files from codebase):
+  review                         - Review entire codebase
+  review --filter auth           - Review files matching 'auth'
+  review --filter src/utils/     - Review files in specific folder
+
+For follow-up questions (uses existing context):
+  How should I fix the SQL injection?
+  Can you explain the auth flow?
+  What's wrong with this code? <paste snippet>
+"""
+    )
 
 
 if __name__ == "__main__":
