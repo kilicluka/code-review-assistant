@@ -149,6 +149,16 @@ traversal. For a web service deployment, additional path boundary validation wou
 
 **API Keys**: Keys are read from environment variables, not stored in code.
 
+## Testing
+
+```bash
+# Run all tests
+pytest
+
+# Run with verbose output
+pytest -v
+```
+
 ## Known Limitations
 
 - **Context limits**: Large codebases may exceed LLM context window
@@ -167,10 +177,16 @@ code-review-assistant/
 ├── .python-version          # Python version (pyenv)
 ├── .gitignore
 ├── README.md
-└── agent/
+├── agent/
+│   ├── __init__.py
+│   ├── reviewer.py          # Core review logic
+│   ├── file_loader.py       # File traversal and loading
+│   ├── prompts.py           # Prompt templates
+│   └── llm_client.py        # LLM abstraction layer
+└── tests/
     ├── __init__.py
-    ├── reviewer.py          # Core review logic
-    ├── file_loader.py       # File traversal and loading
-    ├── prompts.py           # Prompt templates
-    └── llm_client.py        # LLM abstraction layer
+    ├── test_file_loader.py  # File loading tests
+    ├── test_llm_client.py   # LLM client tests
+    ├── test_reviewer.py     # Reviewer tests
+    └── test_main.py         # CLI integration tests
 ```
